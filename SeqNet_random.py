@@ -30,7 +30,7 @@ class GeneNetworkGenerator:
             matrix -= 10 * min_eig * np.eye(matrix.shape[0])
         return matrix
 
-    def generate_network_structure(self, num_genes, num_modules):
+    def generate_network_structure(self, num_genes, num_modules, hub_genes):
         G = nx.Graph()
         selected_genes = set()
         module_sizes = [self.generate_module_size() for _ in range(num_modules)]
@@ -66,17 +66,17 @@ class GeneNetworkGenerator:
             k = min(self.k, len(module) - 1)
             
             # Create a Watts-Strogatz small-world graph for the module
-            module_graph = nx.watts_strogatz_graph(len(module), k, self.p)
-            # using barabasi albert method
-            # module_graph = nx.barabasi_albert_graph(n=len(module), m=1, )
-
+            if any(gene in hub_genes for gene in module):
+                module_graph = nx.barabasi_albert_graph(n=len(module), m=10)
+            else:
+                module_graph = nx.barabasi_albert_graph(n=len(module), m=1)
+            
             # Add module state to the modules list
             self.subgraphs.append(module_graph)
         
             # Add edges to the global graph G
             for edge in module_graph.edges():
                 G.add_edge(module[edge[0]], module[edge[1]])
-        
         
         return G, list(selected_genes)
 
@@ -114,9 +114,9 @@ class GeneNetworkGenerator:
             rnaseq_data[:, i] = np.interp(norm.cdf(gaussian_values[:, i]), np.linspace(0, 1, len(empirical_cdf[:, i])), empirical_cdf[:, i])
         return rnaseq_data
 
-    def generate_synthetic_data(self, num_genes, num_samples, num_modules):
+    def generate_synthetic_data(self, num_genes, num_samples, num_modules, hub_genes):
         # Generate the network structure
-        G, selected_genes = self.generate_network_structure(num_genes, num_modules)
+        G, selected_genes = self.generate_network_structure(num_genes, num_modules, hub_genes)
 
         # Print the structure of the graph
         print("Graph information:")
@@ -124,10 +124,11 @@ class GeneNetworkGenerator:
         print(f"Number of edges: {G.number_of_edges()}")
 
         # Draw the network
-        plt.figure(figsize=(6, 6))
+        plt.figure(figsize=(10, 10))
         pos = nx.spring_layout(G)
-        nx.draw(G, pos, with_labels=False, node_size=50, node_color='blue', edge_color='gray')
-        plt.title("Generated Gene Network")
+        node_colors = ['red' if node in hub_genes else 'blue' for node in G.nodes()]
+        nx.draw(G, pos, with_labels=False, node_size=50, node_color=node_colors, edge_color='gray')
+        plt.title("Generated Gene Network with Hub Genes Highlighted")
         plt.show()
 
         # Generate the precision matrices
@@ -170,11 +171,16 @@ class GeneNetworkGenerator:
 
         print("Synthetic RNA-seq data saved to 'synthetic_rnaseq_data.csv'.")
 
+# Initialize parameters
+num_genes = 1000
+num_modules = 10
+hub_genes = np.random.choice(num_genes, size=(50,), replace=False)  # Select 50 genes as hub genes
+
 # Create an instance of the class
 generator = GeneNetworkGenerator()
 
 # Generate synthetic data
-generator.generate_synthetic_data(1000, 1000, 10)
+generator.generate_synthetic_data(num_genes, 2000, num_modules, hub_genes)
 
 # Print module states
 for idx, module in enumerate(generator.modules):
