@@ -173,6 +173,7 @@ class GeneNetworkGenerator:
 
 # Initialize parameters
 num_genes = 1000
+num_samples = 1000
 num_modules = 10
 hub_genes = np.random.choice(num_genes, size=(50,), replace=False)  # Select 50 genes as hub genes
 
@@ -180,7 +181,7 @@ hub_genes = np.random.choice(num_genes, size=(50,), replace=False)  # Select 50 
 generator = GeneNetworkGenerator()
 
 # Generate synthetic data
-generator.generate_synthetic_data(num_genes, 2000, num_modules, hub_genes)
+generator.generate_synthetic_data(num_genes, num_samples, num_modules, hub_genes)
 
 # Print module states
 for idx, module in enumerate(generator.modules):
