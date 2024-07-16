@@ -1,7 +1,6 @@
 import numpy as np, os
 import pandas as pd
 import networkx as nx
-import os
 
 import torch
 from torch import nn
@@ -84,7 +83,7 @@ def generate_precision_matrix(adjmat, epsilon=1e-5, k=2.5):
     
     return Omega
 
-def generate_data(adjmat, epsilon=1e-4, num_samples=100):
+def generate_data(adjmat, num_samples, epsilon=1e-4):
     Omega = generate_precision_matrix(adjmat)
     cov = np.linalg.inv(Omega)  # Use np.linalg.inv to get the covariance matrix
     L = np.linalg.cholesky(cov)  # Cholesky factorization of covariance matrix
@@ -92,16 +91,22 @@ def generate_data(adjmat, epsilon=1e-4, num_samples=100):
     X = np.einsum("ij, bj -> bi", L, Z)  # Zero mean multivariate Gaussian
     return X
 
-X1 = generate_data(original_adjmat)
-X2 = generate_data(new_adjmat)
+X1 = generate_data(original_adjmat, 500)
+X2 = generate_data(new_adjmat, 500)
+
+# Stack X1 and X2
+X = np.vstack((X1, X2))
+
+# Create labels
+Y = np.array([0]*500 + [1]*500)
 
 # Add gene names and sample IDs, then save to CSV
-def save_to_csv(data, filename, gene_list, num_samples):
-    df = pd.DataFrame(data.T, columns=[f'Sample_{i+1}' for i in range(num_samples)])
-    df.index = gene_list
+def save_to_csv(data, labels, filename, gene_list):
+    df = pd.DataFrame(data, columns=gene_list)
+    df['Label'] = labels
+    df.index = [f'Sample_{i+1}' for i in range(data.shape[0])]
     df.to_csv(filename)
     print(f"Data saved to '{filename}'.")
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
-save_to_csv(X1, script_directory + '/original_data.csv', gene_list, X1.shape[0])
-save_to_csv(X2, script_directory + '/perturbed_data.csv', gene_list, X2.shape[0])
+save_to_csv(X, Y, script_directory + '/combined_data.csv', gene_list)
