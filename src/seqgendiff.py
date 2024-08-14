@@ -38,7 +38,6 @@ class SeqGenDiff:
                               dispersion factor of the negative binomial distribution
                             for sampling. dispersion factor r = mean / disp_factor
                             default: disp_factor = 3. 
-                            Variance of the negative 
         """
         if cov != None:
             assert np.all(cov == cov.T)
@@ -48,6 +47,10 @@ class SeqGenDiff:
         self.cov = cov 
         self.data_model = data_model.strip().lower()
         self.data_dist = stats.poisson if self.data_model == 'poisson' else stats.nbinom
+    
+    def generate_by_network_perturbation(self, n1, n2, 
+                                down_idx=[], up_idx=[], 
+                                fold_change_min=2, fold_change_max=5):
     
     def generate_by_effect_size(self, n1, n2, 
                                 down_idx=[], up_idx=[], 
