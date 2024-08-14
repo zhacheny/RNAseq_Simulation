@@ -34,7 +34,7 @@ def generate_cov_mat_from_adjacency(adj_mat, rho_min=0.7, eps=1e-10):
     sign = np.random.choice([-1., 1.,], replace=True, size=(n, n))
     W = W*sign
     W = W + W.T 
-    cov = np.eye(*W.shape) + W*A 
+    cov = np.eye(*W.shape) + W*adj_mat
 
     # correct for positive definiteness  
     lam, _ = np.linalg.eig(cov) 

@@ -1,8 +1,7 @@
 import numpy as np
 from scipy import stats
 import networkx as nx
-from .utils  import generate_cov_mat_from_adjacency
-import torch_geometric as tg
+from .utils import generate_cov_mat_from_adjacency
 
 class SeqGenDiff:
     """
@@ -64,10 +63,9 @@ class SeqGenDiff:
         self.data_model = data_model.strip().lower()
         self.data_dist = stats.poisson if self.data_model == 'poisson' else stats.nbinom
     
-
     def _get_covariance_matrix(self,):
-        if self.edge_index == None and self.adj_mat == None: 
-            if self.cov == None:
+        if self.edge_index is None and self.adj_mat is None: 
+            if self.cov is None:
                 return np.eye(len(self.means))
             else:
                 return self.cov
@@ -81,6 +79,7 @@ class SeqGenDiff:
             return generate_cov_mat_from_adjacency(adj_mat)
                 
         else:
+            adj_mat = self.adj_mat
             if not np.all(adj_mat == adj_mat.T):
                 adj_mat = np.triu(adj_mat, 1)
                 adj_mat = adj_mat + adj_mat.T 
@@ -149,13 +148,13 @@ class SeqGenDiff:
             hub_idx = np.argmax(node_degrees)
         
         # get k hop neighborhood 
-        k_hop_nodes = np.where(np.linalg.matrix_power(adj_mat, k)[hub_idx])[0]
+        k_hop_nodes = np.where(np.linalg.matrix_power(adj_mat, k_hop)[hub_idx])[0]
         k_hop_nodes = list(k_hop_nodes)
         
         # generate a new subgraph for this k hop neighborhood 
         g_sub = nx.barabasi_albert_graph(len(k_hop_nodes), m=m)
         g_sub = g_sub.to_undirected()
-        adj_mat_sub = nx.to_numpy_array(adj_mat_sub)
+        adj_mat_sub = nx.to_numpy_array(g_sub)
         adj_mat[k_hop_nodes][:, k_hop_nodes] = adj_mat_sub
 
         # generate covariance matrix for this new adjacency matrix 
@@ -235,10 +234,17 @@ class SeqGenDiff:
 
         # stack, shuffle and return 
         x = np.vstack([x1, x2])
-        perm = np.random.permutation(len(x))
-        x = x[perm] 
+        #perm = np.random.permutation(len(x))
+        #x = x[perm] 
         return x 
-
 if __name__ == "__main__":
     from pdb import set_trace 
+    n = 50
+    data = [np.random.poisson(lam=np.random.uniform(50., 100., size=(n,))) for _ in range(200)]
+    data = np.array(data)
+    g = nx.random_geometric_graph(n, 0.3)
+    A = nx.to_numpy_array(g)
+    seqgendiff = SeqGenDiff(data=data, data_model='poisson', adj_mat=A)
+    X  = seqgendiff.generate_by_network_perturbation(n1 = 200, n2 = 200, )
+    print(X.shape)
     set_trace()
