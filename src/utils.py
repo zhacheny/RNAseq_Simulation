@@ -1,5 +1,15 @@
 import numpy as np 
 
+def edge_index_to_adj_mat(edge_index, num_nodes=None):
+    if not num_nodes:
+        num_nodes = 1 + np.max(edge_index[0])
+    adj_mat = np.zeros((num_nodes, num_nodes))
+    adj_mat[edge_index[0]][:, edge_index[1]] = 1. 
+    return adj_mat 
+
+def adj_mat_to_edge_index(adj_mat):
+    return np.vstack(np.where(adj_mat))
+
 def generate_cov_mat_from_adjacency(adj_mat, rho_min=0.7, eps=1e-10):
     """
     Generate a covariance matrix from an adjacency matrix.

@@ -32,7 +32,7 @@ class Polyester:
                             for sampling. dispersion factor r = mean / disp_factor
                             default: disp_factor = 3. 
                             Variance of the negative 
-        """" 
+        """
         assert data.ndim == 2
         means = data.mean(0)  # per gene mean
         self.disp_factor = disp_factor
