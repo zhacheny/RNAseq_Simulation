@@ -1,6 +1,8 @@
 import numpy as np
 from scipy import stats
+import networkx as nx
 from .utils  import generate_cov_mat_from_adjacency
+import torch_geometric as tg
 
 class SeqGenDiff:
     """
@@ -62,16 +64,29 @@ class SeqGenDiff:
         self.data_model = data_model.strip().lower()
         self.data_dist = stats.poisson if self.data_model == 'poisson' else stats.nbinom
     
-    def _get_covariance_matrix(self, A):
+
+    def _get_covariance_matrix(self,):
+        if self.edge_index == None and self.adj_mat == None: 
+            if self.cov == None:
+                return np.eye(len(self.means))
+            else:
+                return self.cov
+        
         if self.edge_index != None:
             adj_mat = np.zeros((len(self.means), len(self.means)))
             adj_mat[edge_index[0]][:, edge_index[1]] = 1. 
-            # if not np.all(adj_mat == adj_mat.T):
-            #     # force  
-            #     continue
+            if not np.all(adj_mat == adj_mat.T):
+                adj_mat = np.triu(adj_mat, 1)
+                adj_mat = adj_mat + adj_mat.T 
+            return generate_cov_mat_from_adjacency(adj_mat)
+                
+        else:
+            if not np.all(adj_mat == adj_mat.T):
+                adj_mat = np.triu(adj_mat, 1)
+                adj_mat = adj_mat + adj_mat.T 
+            return generate_cov_mat_from_adjacency(adj_mat)
 
-    
-    def generate_by_network_perturbation(self, n1, n2, k_hop=1, hub_idx=None):
+    def generate_by_network_perturbation(self, n1, n2, k_hop=1, hub_idx=None, m=2):
         """
         Note: This method is only applicable if self.cov is not None or an identity 
         matrix i.e., there is a non trivial network topology over the set of genes. 
@@ -87,6 +102,8 @@ class SeqGenDiff:
                         with the hub gene. 
         hub_idx <int> - The index of the gene to use as the hub gene. If None is provided, 
                         the node with the highest degree is used. 
+        m <int> - Hyperparameter of Barabasi Albert random graph generator for generating 
+                    perturbed network. 
         
         
         Returns:
@@ -94,13 +111,11 @@ class SeqGenDiff:
         X <numpy.ndarray> - Data matrix of size (n1+n2, num genes). Each row 
                             is synthetic read count data for either a case or control
                             sample. 
+
         """
         # generate n1 samples in normal condition 
         theta_m = np.log2(1e-10 + self.means)
-        if self.cov == None:
-            theta_cov = np.eye(len(theta_m))
-        else:
-            theta_cov = self.cov
+        theta_cov = self._get_covariance_matrix()
         theta = np.random.multivariate_normal(mean=theta_m, cov=theta_cov)
         mu = 2**theta
         if self.data_model == 'poisson':
@@ -117,8 +132,53 @@ class SeqGenDiff:
             return x1
         
         # generate case samples 
+        # rewire the adjacency matrix 
+        # set up adjacency matrix 
+        if self.edge_index != None:
+            adj_mat = np.zeros((len(theta), len(theta)))
+            adj_mat[self.edge_index[0]][:, self.edge_index[1]] = 1.
+        else:
+            adj_mat = self.adj_mat 
+        if not np.all(adj_mat == adj_mat.T):
+            adj_mat = np.triu(adj_mat, 1)
+            adj_mat = adj_mat + adj_mat.T 
+        
+        # set up the hub node index.
+        if hub_idx == None:
+            node_degrees = np.sum(adj_mat, axis=1)
+            hub_idx = np.argmax(node_degrees)
+        
+        # get k hop neighborhood 
+        k_hop_nodes = np.where(np.linalg.matrix_power(adj_mat, k)[hub_idx])[0]
+        k_hop_nodes = list(k_hop_nodes)
+        
+        # generate a new subgraph for this k hop neighborhood 
+        g_sub = nx.barabasi_albert_graph(len(k_hop_nodes), m=m)
+        g_sub = g_sub.to_undirected()
+        adj_mat_sub = nx.to_numpy_array(adj_mat_sub)
+        adj_mat[k_hop_nodes][:, k_hop_nodes] = adj_mat_sub
 
-    
+        # generate covariance matrix for this new adjacency matrix 
+        theta_cov = generate_cov_mat_from_adjacency(adj_mat)
+
+        # generate the data for the test condition 
+        theta = np.random.multivariate_normal(mean=theta_m, cov=theta_cov)
+        mu = 2**theta
+        if self.data_model == 'poisson':
+            args = (mu,)
+        else:
+            var = self._variance(mu)
+            args = ((mu*mu) / (var - mu), mu/var)
+        data_dist = self.data_dist(*args)
+        x2 = [data_dist.rvs() for _ in range(n2)]
+        x2 = np.array(x2)
+
+        # stack, shuffle and return 
+        x = np.vstack([x1, x2])
+        perm = np.random.permutation(len(x))
+        x = x[perm] 
+        return x 
+
     def generate_by_effect_size(self, n1, n2, 
                                 down_idx=[], up_idx=[], 
                                 fold_change_min=2, fold_change_max=5):
@@ -141,10 +201,7 @@ class SeqGenDiff:
         """
         # generate n1 samples in normal condition 
         theta_m = np.log2(1e-10 + self.means)
-        if self.cov == None:
-            theta_cov = np.eye(len(theta_m))
-        else:
-            theta_cov = self.cov
+        theta_cov = self._get_covariance_matrix()
         theta = np.random.multivariate_normal(mean=theta_m, cov=theta_cov)
         mu = 2**theta
         if self.data_model == 'poisson':
