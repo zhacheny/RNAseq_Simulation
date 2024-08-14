@@ -26,7 +26,7 @@ class Polyester:
         """
         Parameters
         ----------
-        data <str> - numpy matrix of read data - rows are samples columns are genes. 
+        data <numpy.ndarray> - numpy matrix of read data - rows are samples columns are genes. 
         disp_factor <float> - The factor by which to scale the mean to obtain 
                               dispersion factor of the negative binomial distribution
                             for sampling. dispersion factor r = mean / disp_factor
@@ -38,13 +38,13 @@ class Polyester:
         self.disp_factor = disp_factor
         self.mu = means
 
-    def _generate(num_samples, mu, var):
+    def _generate(self, num_samples, mu, var):
         p = mu / var  
         n = (mu**2) / (var - mu)
         return np.array([np.random.negative_binomial(n, p) \
                         for _ in range(num_samples)])
 
-    def generate(n1, n2, down_idx=[], up_idx=[], fold_change_min=2, fold_change_max=5):
+    def generate(self, n1, n2, down_idx=[], up_idx=[], fold_change_min=2, fold_change_max=5):
         """
         Simulate RNASeq data for two conditions. 
         The baseline control condition has means determined by the input 
